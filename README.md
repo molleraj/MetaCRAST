@@ -1,6 +1,6 @@
 # MetaCRAST: reference-guided CRISPR detection in metagenomes
 # Introduction
-`MetaCRAST` is a tool to detect CRISPR arrays in raw, unassembled metagenomes. 
+`MetaCRAST` is a tool to detect CRISPR arrays in raw, unassembled metagenomes. Unlike other tools, it uses expected CRISPR direct repeat (DR) sequences from assembled contigs or bacterial genomes to guide metagenomic CRISPR detection. It uses a fast implementation of the Wu-Manber multipattern search algorithm to rapidly select reads that contain an expected DR sequence. It then proceeds through these reads to find more copies of the DR within acceptable distances of each other (i.e., with acceptable length spacers between them). Spacers are then extracted from   
 
 # Installation
 
@@ -20,10 +20,10 @@ A simple local install script is included (`local_install.sh`).
 `MetaCRAST -p patterns.fasta -i infile.fasta -o output_dir [-t] tmp_dir -d dist_allowed [-h] use Hamming Distance [-r] reverse_complement [-l] max_spacer_length [-c] cd_hit_similarity_threshold [-a] total_spacer_cd_hit_similarity_threshold [-n] num_procs`
 
 The required arguments are as follows:
-* **`-p`**
-* **`-i`**
-* **`-o`**
-* **`-d`**
+* **`-p`** Pattern file containing query DR sequences in **FASTA** format
+* **`-i`** Input metagenome in **FASTA** format
+* **`-o`** Output directory for detected reads and spacers.
+* **`-d`** Allowed edit distance (insertions, deletions, or substitutions) for initial DR detection with the Wu-Manber algorithm.
 
 And the optional arguments are:
 * **`-t`**
