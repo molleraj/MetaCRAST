@@ -4,7 +4,7 @@
 
 # Installation
 
-Dependencies: `fasta-splitter.pl`, `cd-hit`
+Dependencies: `fasta-splitter.pl`, `cd-hit`, `perl` (of course!)
 
 CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also be obtained here: https://github.com/weizhongli/cdhit.
 
