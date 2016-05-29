@@ -3,7 +3,10 @@
 `MetaCRAST` is a tool to detect CRISPR arrays in raw, unassembled metagenomes. 
 
 # Installation
+
 Dependencies: `fasta-splitter.pl`, `cd-hit`
+CD-HIT can be obtained here: https://github.com/weizhongli/cdhit
+fasta-splitter.pl is included in the repository. It can also be obtained here: http://kirill-kryukov.com/study/tools/fasta-splitter/
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, and MCE::Loop
 
