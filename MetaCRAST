@@ -20,7 +20,7 @@ my $usage = "MetaCRAST -p patterns.fasta -i infile.fasta -o output_dir [-t] tmp_
 # get values from these options [pidlc] 
 getopt('pidlcnota');
 
-# use this as boolean (either use Hamming distance or do not use it)
+# use this as boolean (either use Hamming distance or do not use it; same for reverse complement)
 getopts('hr');
 
 # use these getopt variables as our variables (set scope)
@@ -81,15 +81,16 @@ else {
 	my @tmp_files = ();
 	opendir(DIR, $tmp_dir) or die $!;
 	while (my $file = readdir(DIR)) {
-    # A file test to check that it is a directory
+	# A file test to check that it is a directory
 	# Use -f to test for a file
         next unless (-f "$tmp_dir/$file");
 		#print "$file\n";
 		$tmp_files[$tmp_count] = $file;
 		$tmp_count++;
-    }
+     }
 
 	my $read_tmp_count = 0;
+	# load up the temporary files for detection
 	foreach my $tmp_file (@tmp_files) {
 		$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
 		$read_tmp_count++;
@@ -100,12 +101,14 @@ else {
 	};
 }
 
+# initialize output arrays and total pattern count variable
 my @seq_io_OUT_pattern = ();
 my @seq_io_OUT_spacers = ();
 my @spacers_for_pattern = (); 
 my $pattern_count = 0;
 my @CRISPR_DRs = ();
 
+# Load CRISPR DRs to be matched in metagenome 
 print "Parsing Input CRISPR DRs...\n";
 while (my $pattern_object = $pattern_io_IN->next_seq()) {
 	my $pattern = $pattern_object->seq();
@@ -135,13 +138,16 @@ foreach my $pattern (@CRISPR_DRs) {
 	$count++;
 }
 
+# summarize progress
 print "Writing detected reads to disk...\n";
 my $seq_number = 0;
 my $step = 100000;
 
+# if no processors, just do patternloop with input 0
 if ( length $num_procs == 0 ) {
 patternloop(0);
 }
+# otherwise, parallelize with mce_loop and do patternloop over each temporary metagenome part to find reads containing DRs
 else {
 mce_loop {  
 	patternloop($_);
@@ -160,6 +166,7 @@ foreach my $pattern (@CRISPR_DRs) {
 	$count++;
 }
 
+# do spacerloop to extract spacers from detected reads
 spacerloop();
 
 print "Writing detected spacers to disk...\n";
@@ -235,10 +242,12 @@ if ( length $num_procs != 0 ) {
 	print `$final_cleanup`;
 }
 
+# calculate Hamming distance using XOR function
 sub XORhd {
 	return ($_[0] ^ $_[1]) =~ tr/\001-\255//;
 }
 
+# make sure ends of query DR sequence match ends of candidate DR sequence in read
 sub XORedgeCheck {
 	my $first0 = substr($_[0],0,1);
 	my $last0 = substr($_[0],-1,1);
@@ -255,6 +264,7 @@ sub XORedgeCheck {
 	}
 }
 
+# subroutine to get locations of DRs and Spacers given Levenshtein distance metric 
 sub getIndicesLD {
 	my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	my $seq_len = length($raw_seq);
@@ -310,6 +320,7 @@ sub getIndicesLD {
 	return (\@start_indices,\@end_indices,\@distances);
 }
 
+# subroutine to get locations of DRs and Spacers given Hamming distance metric 
 sub getIndicesHD {
 my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	my $seq_len = length($raw_seq);
@@ -361,6 +372,7 @@ sub getSpacers {
 	return(\@spacers);
 }	
 
+# subroutine to get index of minimum value in array
 sub minindex {
   my( $aref, $idx_min ) = ( shift, 0 );
   $aref->[$idx_min] < $aref->[$_] or $idx_min = $_ for 1 .. $#{$aref};
