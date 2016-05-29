@@ -28,13 +28,13 @@ The required arguments are as follows:
 * **`-d`** Allowed edit distance (insertions, deletions, or substitutions) for initial read detection with the Wu-Manber algorithm and subsequent DR detection steps
 
 And the optional arguments are:
-* **`-t`** Temporary directory to put split metagenome (use this if -n option also selected)
+* **`-t`** Temporary directory to put metagenome parts (use this if -n option also selected)
 * **`-h`** Use Hamming distance metric (substitutions only - no insertions or deletions) to find direct repeat locations in reads (default: use Levenshtein distance metric - look for sequences matching DR within insertion, deletion, and/or substitution edit distance) 
 * **`-r`** Search for reverse complement of CRISPR direct repeat sequences
 * **`-l`** Maximum spacer length in bp
 * **`-c`** CD-HIT similarity threshold for clustering spacers detected for each query direct repeat
 * **`-a`** CD-HIT similarity threshold for clustering all detected spacers 
-* **`-n`** Number of processors to use for parallel processing
+* **`-n`** Number of processors to use for parallel processing (and number of temporary metagenome parts)
 
 # Examples 
 
