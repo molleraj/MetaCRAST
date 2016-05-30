@@ -36,6 +36,8 @@ And the optional arguments are:
 * **`-a`** CD-HIT similarity threshold for clustering all detected spacers 
 * **`-n`** Number of processors to use for parallel processing (and number of temporary metagenome parts)
 
+To get queries, there is another script provided (`getDRquery.pl`) along with a database of direct repeats downloaded from CRISPRdb and indexed taxonomically (`DRdatabaseTax.fa`).  
+
 # Examples 
 
 Sample query sequences are included. 
