@@ -38,6 +38,8 @@ And the optional arguments are:
 
 To get queries, there is another script provided (`getDRquery.pl`) along with a database of direct repeats downloaded from CRISPRdb and indexed taxonomically (`DRdatabaseTax.fa`).  
 
+Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query output_file`
+
 # Examples 
 
 Sample query sequences are included. 
