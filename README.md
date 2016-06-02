@@ -47,13 +47,17 @@ To get queries, there is another script provided (`getDRquery.pl`) along with a 
 
 Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query output_file`
 
-* **`DR_database_path`** Path to the direct repeat sequence database in FASTA format (e.g., ~/MetaCRAST/data/DRdatabaseTax.fa)
+* **`DR_database_path`** Path to the direct repeat sequence database in FASTA format (e.g., `~/MetaCRAST/data/DRdatabaseTax.fa`)
 * **`query`** The taxon you want to look up in the database (e.g., Escherichia). This should be a kingdom, phylum, class, order, family, genus, or species name.
-* **`output_file`** Name of your output query DR file in FASTA format (e.g., sample_query.fa)
+* **`output_file`** Name of your output query DR file in FASTA format (e.g., `sample_query.fa`)
 
 # Examples 
 
 Sample query sequences are included. 
+
+# Issues
+
+If you notice any bugs or issues, please report them under the 'Issues' tab or contact me at molleraj@gmail.com.
 
 # Citation
 If you use `MetaCRAST` in published work, please include a reference to my Bioinformatics paper.
