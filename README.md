@@ -11,10 +11,17 @@ Dependencies: `fasta-splitter.pl`, `cd-hit`, `perl` (of course!)
 CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also be obtained here: https://github.com/weizhongli/cdhit.
 
 fasta-splitter.pl is included in the repository. It can also be obtained here: http://kirill-kryukov.com/study/tools/fasta-splitter/.
+fasta-splitter.pl depends on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these 
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, and MCE::Loop
 
-A simple local install script is included (`local_install.sh`).
+A simple local install script is included (`local_install.sh`). To clone and install from this repository, follow these commands from your home directory:
+
+`git clone https://github.com/molleraj/MetaCRAST.git`
+
+`cd ~/MetaCRAST`
+
+`sh local_install.sh`
 
 # Usage 
 `MetaCRAST` takes **FASTA** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
