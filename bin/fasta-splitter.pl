@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/env perl --
 #
 #  FASTA Splitter  -  a script for partitioning a FASTA file into pieces
 #
