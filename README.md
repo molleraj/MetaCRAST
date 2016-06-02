@@ -18,7 +18,9 @@ Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::Se
 A simple local install script is included (`local_install.sh`). To clone and install from this repository, follow these commands from your home directory:
 
 `git clone https://github.com/molleraj/MetaCRAST.git`
+
 `cd ~/MetaCRAST`
+
 `sh local_install.sh`
 
 # Usage 
