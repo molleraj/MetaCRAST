@@ -14,8 +14,8 @@ sudo perl -MCPAN -e install Text::Levenshtein::XS String::Approx Getopt::Std Bio
 chmod 777 ~/MetaCRAST/bin/*
 
 # add MetaCRAST and MetaCRAST/bin to PATH
-export PATH="$HOME/MetaCRAST:/MetaCRAST/bin:$PATH"
-echo "export PATH='$HOME/MetaCRAST:$HOME/MetaCRAST/bin:$PATH'" >> ~/.bash_profile
-echo "export PATH='$HOME/MetaCRAST:$HOME/MetaCRAST/bin:$PATH'" >> ~/.profile
+export PATH="$HOME/MetaCRAST/bin:$PATH"
+echo "export PATH='$HOME/MetaCRAST/bin:$PATH'" >> ~/.bash_profile
+echo "export PATH='$HOME/MetaCRAST/bin:$PATH'" >> ~/.profile
 source ~/.bash_profile
 source ~/.profile
