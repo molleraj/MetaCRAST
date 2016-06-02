@@ -1,4 +1,4 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl --
 
 # program to search 454 or Illumina reads for matches to specified CRISPR DRs
 # uses implementation of Wu-Manber multipattern search algorithm 
