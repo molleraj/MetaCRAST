@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-my $usage = "getDRquery.pl DR_database_path query output_file";
+my $usage = "getDRquery.pl DR_database_path query output_file\n";
 
 my $DR_database_path = $ARGV[0] or die $usage;
 my $query = $ARGV[1] or die $usage;
