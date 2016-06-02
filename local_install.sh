@@ -16,5 +16,7 @@ sudo chmod 777 ~/MetaCRAST/bin/*
 
 # add MetaCRAST and MetaCRAST/bin to PATH
 export PATH=$HOME/MetaCRAST/bin:$PATH
+sudo echo "export PATH=$HOME/MetaCRAST/bin:$PATH" >> ~/.bash_profile
 sudo echo "export PATH=$HOME/MetaCRAST/bin:$PATH" >> ~/.profile
+source ~/.bash_profile
 source ~/.profile
