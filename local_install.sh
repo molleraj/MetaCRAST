@@ -1,9 +1,7 @@
+#!/bin/sh
 # How to install
 # IN HOME FOLDER: git clone https://github.com/molleraj/MetaCRAST.git
 # chmod 777 ~/MetaCRAST/local_install.sh
-
-#!/bin/sh
-
 # install cd-hit
 sudo apt-get install cd-hit
 
