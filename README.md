@@ -10,17 +10,15 @@ Dependencies: `fasta-splitter.pl`, `cd-hit`, `perl` (of course!)
 
 CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also be obtained here: https://github.com/weizhongli/cdhit.
 
-fasta-splitter.pl is included in the repository. It can also be obtained here: http://kirill-kryukov.com/study/tools/fasta-splitter/.
-fasta-splitter.pl depends on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these 
+`fasta-splitter.pl` is included in the repository. It can also be obtained here: http://kirill-kryukov.com/study/tools/fasta-splitter/.
+`fasta-splitter.pl` depends on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these using CPAN (these will be installed by default using `local_install.sh`.
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, and MCE::Loop
 
 A simple local install script is included (`local_install.sh`). To clone and install from this repository, follow these commands from your home directory:
 
 `git clone https://github.com/molleraj/MetaCRAST.git`
-
 `cd ~/MetaCRAST`
-
 `sh local_install.sh`
 
 # Usage 
@@ -46,6 +44,10 @@ And the optional arguments are:
 To get queries, there is another script provided (`getDRquery.pl`) along with a database of direct repeats downloaded from CRISPRdb and indexed taxonomically (`DRdatabaseTax.fa`).  
 
 Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query output_file`
+
+* **`DR_database_path`** Path to the direct repeat sequence database in FASTA format (e.g., ~/MetaCRAST/data/DRdatabaseTax.fa)
+* **`query`** The taxon you want to look up in the database (e.g., Escherichia). This should be a kingdom, phylum, class, order, family, genus, or species name.
+* **`output_file`** Name of your output query DR file in FASTA format (e.g., sample_query.fa)
 
 # Examples 
 
