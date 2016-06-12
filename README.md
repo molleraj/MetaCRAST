@@ -1,6 +1,6 @@
 # MetaCRAST: reference-guided CRISPR detection in metagenomes
 # Introduction
-`MetaCRAST` is a tool to detect CRISPR arrays in raw, unassembled metagenomes. Unlike other tools, it uses expected CRISPR direct repeat (DR) sequences from assembled contigs or bacterial genomes to guide metagenomic CRISPR detection. It uses a fast implementation of the Wu-Manber multipattern search algorithm to rapidly select reads that contain an expected DR sequence. It then proceeds through reads identified in the previous step to find DR sequences within acceptable distances of each other (i.e., with acceptable length spacers between them). Spacers between these DRs are then extracted and clustered into a non-redundant set with CD-HIT. 
+`MetaCRAST` (Metagenomic CRISPR Reference-Aided Search Tool) is a tool to detect CRISPR arrays in raw, unassembled metagenomes. Unlike other tools, it uses expected CRISPR direct repeat (DR) sequences from assembled contigs or bacterial genomes to guide metagenomic CRISPR detection. It uses a fast implementation of the Wu-Manber multipattern search algorithm to rapidly select reads that contain an expected DR sequence. It then proceeds through reads identified in the previous step to find DR sequences within acceptable distances of each other (i.e., with acceptable length spacers between them). Spacers between these DRs are then extracted and clustered into a non-redundant set with CD-HIT. 
 
 `MetaCRAST` is also parallelizable thanks to the application of Many Core Engine (MCE) and fasta-splitter.pl. Metagenome inputs can be split up for parallel CRISPR detection in multi-core systems (see use of -n option). 
 
@@ -22,6 +22,8 @@ A simple local install script is included (`local_install.sh`). To clone and ins
 `cd ~/MetaCRAST`
 
 `sh local_install.sh`
+
+A sample simulated metagenome is included in MetaCRAST/data. You can use this to test the software. 
 
 # Usage 
 `MetaCRAST` takes **FASTA** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
@@ -53,7 +55,9 @@ Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query outp
 
 # Examples 
 
-Sample query sequences are included. 
+Sample query sequences are included in MetaCRAST/query. Here is sample usage:
+
+Here is how you can use the included simulated metagenome to test MetaCRAST: 
 
 # Issues
 
