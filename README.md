@@ -53,6 +53,8 @@ Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query outp
 * **`query`** The taxon you want to look up in the database (e.g., Escherichia). This should be a kingdom, phylum, class, order, family, genus, or species name.
 * **`output_file`** Name of your output query DR file in FASTA format (e.g., `sample_query.fa`)
 
+# Output
+
 # Examples 
 
 Sample query sequences are included in MetaCRAST/query. Here is sample usage:
