@@ -31,7 +31,7 @@ Then, to check the number of spacers detected, do this:
 
 `grep -c ">" test/totalSpacersCD90.fa`
 
-There should be spacers detected.
+There should be 118 spacers detected.
 
 # Usage 
 `MetaCRAST` takes **FASTA** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
