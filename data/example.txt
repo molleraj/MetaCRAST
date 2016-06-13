@@ -1,3 +1,13 @@
 The included metagenome has the following characteristics:
 
+454 sequencing model - homopolymer errors (Balzer et al., 2010)
+Average read length: 600 bp
+Standard deviation: 50 bp
+Distribution: Normal
+Generated with Grinder (Angly et al., 2012)
 
+Taxonomic profile used to generate the metagenome: 
+Leptospirillum sp. Group II 'CF-1', complete genome - gi|906338582|ref|NZ_CP012147.1| 65
+Ferroplasma acidarmanus fer1, complete genome - gi|518651360|ref|NC_021592.1| 35
+
+This is a way oversimplified representation of an acid mine drainage (AMD) metagenome.
