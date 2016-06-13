@@ -24,9 +24,14 @@ A simple local install script is included (`local_install.sh`). To clone and ins
 `sh local_install.sh`
 
 A sample simulated metagenome is included in `MetaCRAST/data` (`simAMDmetagenome-600-454.fasta`). This is a simulated acid mine drainage metagenome generated with Grinder (Angly et al., 2012). You can use this to test the software, as follows, from the MetaCRAST directory (`MetaCRAST/`):
-``
+
+`MetaCRAST -p ./query/AMDquery.fa -i ./data/simAMDmetagenome-600-454.fasta -d 3 -l 60 -c 0.9 -a 0.9`
+
 Then, to check the number of spacers detected, do this:
-`grep -c ">" totalSpacersCD90.fa`
+
+`grep -c ">" test/totalSpacersCD90.fa`
+
+There should be spacers detected.
 
 # Usage 
 `MetaCRAST` takes **FASTA** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
