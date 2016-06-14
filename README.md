@@ -65,9 +65,13 @@ Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query outp
 
 # Examples 
 
-Sample query sequences are included in MetaCRAST/query. Here is sample usage:
+Sample query sequences are included in `MetaCRAST/query`. 
 
 Here is how you can use the included simulated metagenome to test MetaCRAST: 
+
+`MetaCRAST -p query/AMDquery.fa -i data/simAMDmetagenome-600-454.fasta -o test -d 3 -l 60 -c 0.9 -a 0.9` 
+
+See installation notes for more details about this test. 
 
 # Issues
 
