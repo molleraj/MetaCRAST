@@ -183,6 +183,7 @@ foreach my $pattern (@CRISPR_DRs) {
 	my $spacer_number = 0;
 	foreach my $saving_spacer (@unique_spacers) {
 		my $length_saving_spacer = length($saving_spacer);
+		# only save spacers with length shorter than or equivalent to maximum specified spacer length
 		if ($length_saving_spacer <= $max_spacer_length) {
 			my $saving_spacer_obj = Bio::Seq->new(-seq => $saving_spacer,                        
 				-display_id => "P".$pattern_number_2."S".$spacer_number, -verbose => -1,               
@@ -226,6 +227,7 @@ if (length $opt_c != 0) {
 	}
 }
 
+# cluster all spacers if specified 
 if (length $opt_a != 0) {	
 	my $commandTotalSpacers = "cd-hit -i ".$output_dir."/totalSpacers.fa -o ".$output_dir."/totalSpacersCD".$name_cd_hit_threshold.".fa -c ".$cd_hit_threshold;
 	my $commandCleanTotalSpacers = "rm ".$output_dir."/*.clstr";
@@ -355,6 +357,7 @@ my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	return (\@start_indices,\@end_indices,\@distances);
 }
 
+# subroutine to extract spacers
 sub getSpacers {
 	my ($seq,$raw_start_indices_ref,$raw_end_indices_ref) = @_;
 	my @raw_start_indices = @{ $raw_start_indices_ref };
