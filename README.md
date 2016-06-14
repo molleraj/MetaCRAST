@@ -49,8 +49,8 @@ And the optional arguments are:
 * **`-h`** Use Hamming distance metric (substitutions only - no insertions or deletions) to find direct repeat locations in reads (default: use Levenshtein distance metric - look for sequences matching DR within insertion, deletion, and/or substitution edit distance) 
 * **`-r`** Search for reverse complement of CRISPR direct repeat sequences
 * **`-l`** Maximum spacer length in bp
-* **`-c`** CD-HIT similarity threshold for clustering spacers detected for each query direct repeat
-* **`-a`** CD-HIT similarity threshold for clustering all detected spacers 
+* **`-c`** CD-HIT similarity threshold for clustering spacers detected for each query direct repeat (value from 0 to 1)
+* **`-a`** CD-HIT similarity threshold for clustering all detected spacers (value from 0 to 1)
 * **`-n`** Number of processors to use for parallel processing (and number of temporary metagenome parts)
 
 To get queries, there is another script provided (`getDRquery.pl`) along with a database of direct repeats downloaded from CRISPRdb and indexed taxonomically (`DRdatabaseTax.fa`).  
