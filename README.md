@@ -2,16 +2,16 @@
 # Introduction
 `MetaCRAST` (Metagenomic CRISPR Reference-Aided Search Tool) is a tool to detect CRISPR arrays in raw, unassembled metagenomes. Unlike other tools, it uses expected CRISPR direct repeat (DR) sequences from assembled contigs or bacterial genomes to guide metagenomic CRISPR detection. It uses a fast implementation of the Wu-Manber multipattern search algorithm to rapidly select reads that contain an expected DR sequence. It then proceeds through reads identified in the previous step to find DR sequences within acceptable distances of each other (i.e., with acceptable length spacers between them). Spacers between these DRs are then extracted and clustered into a non-redundant set with CD-HIT. 
 
-`MetaCRAST` is also parallelizable thanks to the application of Many Core Engine (MCE) and fasta-splitter.pl. Metagenome inputs can be split up for parallel CRISPR detection in multi-core systems (see use of -n option). 
+`MetaCRAST` is also parallelizable thanks to the application of Many Core Engine (MCE) and fasta/q-splitter.pl. Metagenome inputs can be split up for parallel CRISPR detection in multi-core systems (see use of -n option). 
 
 # Installation
 
-Dependencies: `fasta-splitter.pl`, `cd-hit`, `perl` (of course!)
+Dependencies: `fasta-splitter.pl`, `fastq-splitter.pl`, `cd-hit`, `perl` (of course!)
 
 CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also be obtained here: https://github.com/weizhongli/cdhit.
 
-`fasta-splitter.pl` is included in the repository. It can also be obtained here: http://kirill-kryukov.com/study/tools/fasta-splitter/.
-`fasta-splitter.pl` depends on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these using CPAN (these will be installed by default using `local_install.sh`).
+`fasta-splitter.pl` and `fastq-splitter.pl` is included in the repository. They can also be obtained here (http://kirill-kryukov.com/study/tools/fasta-splitter/) and here (http://kirill-kryukov.com/study/tools/fastq-splitter/), respectively.
+`fasta-splitter.pl` and `fastq-splitter.pl` depend on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these using CPAN (these will be installed by default using `local_install.sh`).
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, and MCE::Loop
 
@@ -34,7 +34,7 @@ Then, to check the number of spacers detected, do this:
 There should be 117 spacers detected.
 
 # Usage 
-`MetaCRAST` takes **FASTA** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
+`MetaCRAST` takes **FASTA or FASTQ** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
 
 `MetaCRAST -p patterns.fasta -i infile.fasta -o output_dir [-t] tmp_dir -d dist_allowed [-h] use Hamming Distance [-r] reverse_complement [-l] max_spacer_length [-c] cd_hit_similarity_threshold [-a] total_spacer_cd_hit_similarity_threshold [-n] num_procs`
 
@@ -46,6 +46,7 @@ The required arguments are as follows:
 
 And the optional arguments are:
 * **`-t`** Temporary directory to put metagenome parts (use this if -n option also selected)
+* **`-q`** Input metagenome is a FASTQ file (directs use of `fastq-splitter.pl` instead of `fasta-splitter.pl`)
 * **`-h`** Use Hamming distance metric (substitutions only - no insertions or deletions) to find direct repeat locations in reads (default: use Levenshtein distance metric - look for sequences matching DR within insertion, deletion, and/or substitution edit distance) 
 * **`-r`** Search for reverse complement of CRISPR direct repeat sequences
 * **`-l`** Maximum spacer length in bp

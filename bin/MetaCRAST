@@ -1,4 +1,4 @@
-#!/usr/bin/perl --
+#!/usr/bin/perl 
 
 # program to search 454 or Illumina reads for matches to specified CRISPR DRs
 # uses implementation of Wu-Manber multipattern search algorithm 
@@ -14,17 +14,18 @@ use MCE::Loop;
 
 # print usage if minimum requirements not included in command
 
-my $usage = "MetaCRAST -p patterns.fasta -i infile.fasta -o output_dir [-t] tmp_dir -d dist_allowed [-h] (use Hamming Distance) [-r] reverse_complement
-[-l] max_spacer_length [-c] cd_hit_similarity_threshold [-a] total_spacer_cd_hit_similarity_threshold [-n] num_procs\n";
+my $usage = "MetaCRASTnr.pl -piod [-tqhrlcan] \n -p patterns.fasta\/q \n -i infile.fasta\/q \n -o output_dir \n [-t] tmp_dir \n"
+." -d dist_allowed \n [-q] (if FASTQ file input) \n [-h] (use Hamming Distance) \n [-r] reverse_complement \n [-l] max_spacer_length \n"
+." [-c] cd_hit_similarity_threshold \n [-a] total_spacer_cd_hit_similarity_threshold \n [-n] num_procs \n [Optional parameters are in brackets] \n";
 
-# get values from these options [pidlc] 
+# get values from these options [pidlcnota] 
 getopt('pidlcnota');
 
-# use this as boolean (either use Hamming distance or do not use it; same for reverse complement)
-getopts('hr');
+# use this as boolean (either use Hamming distance or do not use it)
+getopts('hrq');
 
 # use these getopt variables as our variables (set scope)
-our($opt_p,$opt_i,$opt_d,$opt_l,$opt_c,$opt_n,$opt_o,$opt_t,$opt_a,$opt_h,$opt_r);
+our($opt_p,$opt_i,$opt_d,$opt_l,$opt_c,$opt_n,$opt_o,$opt_t,$opt_a,$opt_h,$opt_r,$opt_q);
 
 # convert getopt variables into program variables 
 my $pattern_file = $opt_p or die $usage;
@@ -62,56 +63,64 @@ if ( (length $num_procs > 0) && (length $tmp_dir == 0) ) {
 print `mkdir $output_dir`;
 
 # Bio::SeqIO objects for input pattern and input file 
-my $pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
+#my $pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
+open my $pattern_io_IN, '<', $pattern_file;
 my @seq_io_IN = ();
 my @fasta_parts = ();
+my $fh;
 
 if ( length $num_procs == 0 ) {
-	# if number of processors ($num_procs) is not specified, just assume 1 processors
-	# go ahead and parse input file
-	$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
+	#$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
+	open $fh, '<', $fasta_file;
+	push @seq_io_IN, $fh;
 }
+
 else {
-	# do this if number of processors is specified
-	# use fasta-splitter.pl to split up metagenome into n parts for n processors
-	my $split_fasta_cmd = "fasta-splitter.pl --n-parts ".$num_procs." --out-dir ".$tmp_dir." ".$fasta_file;
-	print `$split_fasta_cmd`;
+	if ($opt_q == 1) {
+		my $split_fastq_cmd = "fastq-splitter.pl --n-parts ".$num_procs." --out-dir ".$tmp_dir." ".$fasta_file;
+		print `$split_fastq_cmd`;
+	}
+	else {
+		my $split_fasta_cmd = "fasta-splitter.pl --n-parts ".$num_procs." --out-dir ".$tmp_dir." ".$fasta_file;
+		print `$split_fasta_cmd`;
+	}
 	@fasta_parts = (0..($num_procs-1));
 	my $tmp_count = 0;
 	my @tmp_files = ();
 	opendir(DIR, $tmp_dir) or die $!;
 	while (my $file = readdir(DIR)) {
-	# A file test to check that it is a directory
+    # A file test to check that it is a directory
 	# Use -f to test for a file
         next unless (-f "$tmp_dir/$file");
 		#print "$file\n";
 		$tmp_files[$tmp_count] = $file;
 		$tmp_count++;
-     }
+    }
 
 	my $read_tmp_count = 0;
-	# load up the temporary files for detection
 	foreach my $tmp_file (@tmp_files) {
-		$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
+		#$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
+		open $fh, '<', $tmp_dir."/".$tmp_file;
+		push @seq_io_IN, $fh; 
 		$read_tmp_count++;
 	}
-	# set up MCE loop for later 
 	MCE::Loop::init {
 		chunk_size => 1, max_workers => 'auto'
 	};
 }
+# set up MCE loop
 
-# initialize output arrays and total pattern count variable
+
 my @seq_io_OUT_pattern = ();
 my @seq_io_OUT_spacers = ();
 my @spacers_for_pattern = (); 
 my $pattern_count = 0;
 my @CRISPR_DRs = ();
+my @aux = ();
 
-# Load CRISPR DRs to be matched in metagenome 
 print "Parsing Input CRISPR DRs...\n";
-while (my $pattern_object = $pattern_io_IN->next_seq()) {
-	my $pattern = $pattern_object->seq();
+while (my ($name, $desc, $seq, $qual) = readfq(\*$pattern_io_IN,\@aux)) {
+	my $pattern = $seq;
         $CRISPR_DRs[$pattern_count] = $pattern;
 	$pattern_count++; 
 }
@@ -138,16 +147,14 @@ foreach my $pattern (@CRISPR_DRs) {
 	$count++;
 }
 
-# summarize progress
 print "Writing detected reads to disk...\n";
 my $seq_number = 0;
 my $step = 100000;
 
-# if no processors, just do patternloop with input 0
 if ( length $num_procs == 0 ) {
 patternloop(0);
 }
-# otherwise, parallelize with mce_loop and do patternloop over each temporary metagenome part to find reads containing DRs
+
 else {
 mce_loop {  
 	patternloop($_);
@@ -166,7 +173,6 @@ foreach my $pattern (@CRISPR_DRs) {
 	$count++;
 }
 
-# do spacerloop to extract spacers from detected reads
 spacerloop();
 
 print "Writing detected spacers to disk...\n";
@@ -183,7 +189,6 @@ foreach my $pattern (@CRISPR_DRs) {
 	my $spacer_number = 0;
 	foreach my $saving_spacer (@unique_spacers) {
 		my $length_saving_spacer = length($saving_spacer);
-		# only save spacers with length shorter than or equivalent to maximum specified spacer length
 		if ($length_saving_spacer <= $max_spacer_length) {
 			my $saving_spacer_obj = Bio::Seq->new(-seq => $saving_spacer,                        
 				-display_id => "P".$pattern_number_2."S".$spacer_number, -verbose => -1,               
@@ -207,7 +212,7 @@ if (length $opt_c != 0) {
 	
 	my $pattern_count = 0;
 	foreach my $pattern (@CRISPR_DRs) {
-		my $commandSpacers = "cd-hit -i ".$output_dir."/Spacers-".$pattern_count."-".$pattern.".fa -o ".$output_dir."/CD".$name_cd_hit_threshold."Spacers-".$pattern_count."-".$pattern.".fa -c ".$cd_hit_threshold;
+		my $commandSpacers = "cdhit -i ".$output_dir."/Spacers-".$pattern_count."-".$pattern.".fa -o ".$output_dir."/CD".$name_cd_hit_threshold."Spacers-".$pattern_count."-".$pattern.".fa -c ".$cd_hit_threshold;
 		print `$commandSpacers`;
 		my $cleanSpacers = "rm ".$output_dir."/*.clstr";
 		print `$cleanSpacers`;
@@ -218,7 +223,7 @@ if (length $opt_c != 0) {
 	print `$make_cd_total_cmd`;
 	
 	if (length $opt_a != 0) {
-		my $commandCDTotalSpacers = "cd-hit -i ".$output_dir."/CD".$name_cd_hit_threshold."totalSpacers.fa -o ".$output_dir."/CD".$name_cd_hit_threshold."finalSpacers.fa -c ".$cd_hit_threshold;
+		my $commandCDTotalSpacers = "cdhit -i ".$output_dir."/CD".$name_cd_hit_threshold."totalSpacers.fa -o ".$output_dir."/CD".$name_cd_hit_threshold."finalSpacers.fa -c ".$cd_hit_threshold;
 		my $commandCleanCDTotalSpacers = "rm ".$output_dir."/*.clstr";
 		print `$commandCDTotalSpacers`;
 		print `$commandCleanCDTotalSpacers`;
@@ -227,9 +232,8 @@ if (length $opt_c != 0) {
 	}
 }
 
-# cluster all spacers if specified 
 if (length $opt_a != 0) {	
-	my $commandTotalSpacers = "cd-hit -i ".$output_dir."/totalSpacers.fa -o ".$output_dir."/totalSpacersCD".$name_cd_hit_threshold.".fa -c ".$cd_hit_threshold;
+	my $commandTotalSpacers = "cdhit -i ".$output_dir."/totalSpacers.fa -o ".$output_dir."/totalSpacersCD".$name_cd_hit_threshold.".fa -c ".$cd_hit_threshold;
 	my $commandCleanTotalSpacers = "rm ".$output_dir."/*.clstr";
 	print `$commandTotalSpacers`;
 	print `$commandCleanTotalSpacers`;
@@ -244,12 +248,10 @@ if ( length $num_procs != 0 ) {
 	print `$final_cleanup`;
 }
 
-# calculate Hamming distance using XOR function
 sub XORhd {
 	return ($_[0] ^ $_[1]) =~ tr/\001-\255//;
 }
 
-# make sure ends of query DR sequence match ends of candidate DR sequence in read
 sub XORedgeCheck {
 	my $first0 = substr($_[0],0,1);
 	my $last0 = substr($_[0],-1,1);
@@ -266,7 +268,6 @@ sub XORedgeCheck {
 	}
 }
 
-# subroutine to get locations of DRs and Spacers given Levenshtein distance metric 
 sub getIndicesLD {
 	my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	my $seq_len = length($raw_seq);
@@ -322,7 +323,6 @@ sub getIndicesLD {
 	return (\@start_indices,\@end_indices,\@distances);
 }
 
-# subroutine to get locations of DRs and Spacers given Hamming distance metric 
 sub getIndicesHD {
 my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	my $seq_len = length($raw_seq);
@@ -357,7 +357,6 @@ my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
 	return (\@start_indices,\@end_indices,\@distances);
 }
 
-# subroutine to extract spacers
 sub getSpacers {
 	my ($seq,$raw_start_indices_ref,$raw_end_indices_ref) = @_;
 	my @raw_start_indices = @{ $raw_start_indices_ref };
@@ -375,7 +374,6 @@ sub getSpacers {
 	return(\@spacers);
 }	
 
-# subroutine to get index of minimum value in array
 sub minindex {
   my( $aref, $idx_min ) = ( shift, 0 );
   $aref->[$idx_min] < $aref->[$_] or $idx_min = $_ for 1 .. $#{$aref};
@@ -385,8 +383,10 @@ sub minindex {
 sub patternloop {
 my $seq_number = 0;
 my $part = $_;
-while (my $seq_object = $seq_io_IN[$part]->next_seq()) {
-	my $seq = $seq_object->seq();
+my @aux = ();
+my $current_file_part = $seq_io_IN[$part];
+while (my ($name, $desc, $seq, $qual) = readfq(\*$current_file_part,\@aux)) {
+	#my $seq = $seq_object->seq();
 	my $pattern_number = 0;
 
 	foreach my $pattern (@CRISPR_DRs) {
@@ -444,6 +444,7 @@ while (my $seq_object = $seq_io_IN[$part]->next_seq()) {
 			}
 		#print join(",",@spacers)."\n";
 		if (scalar(@spacers) > 0 ) {
+			my $seq_object = Bio::Seq->new(-seq => $seq, -display_id => $name, -desc => $desc, -alphabet => 'dna');
 			$seq_io_OUT_pattern[$pattern_number]->write_seq($seq_object);
 		}
 		}	
@@ -451,6 +452,7 @@ while (my $seq_object = $seq_io_IN[$part]->next_seq()) {
 	$pattern_number++;
 	}
 	$seq_number++;
+	#print "Sequence Number: ".$seq_number."\n";
 	print "Reads Searched: ".$seq_number."\n" unless ($seq_number % $step);
 }
 }
@@ -526,4 +528,49 @@ while (my $seq_object = $seq_io_READ_pattern[$count]->next_seq()) {
 }
 $count++;
 }
+}
+
+sub readfq {
+	my ($fh, $aux) = @_;
+	@$aux = [undef, 0] if (!defined($aux));
+	return if ($aux->[1]);
+	if (!defined($aux->[0])) {
+		while (<$fh>) {
+			chomp;
+			if (substr($_, 0, 1) eq '>' || substr($_, 0, 1) eq '@') {
+				$aux->[0] = $_;
+				last;
+			}
+		}
+		if (!defined($aux->[0])) {
+			$aux->[1] = 1;
+			return;
+		}
+	}
+	my $header = /^(.+)/? $1 : '';
+	substr($header, 0, 1) = "";
+	my($name, $desc) = split(/\s/, $header, 2);
+	my $seq = '';
+	my $c;
+	$aux->[0] = undef;
+	while (<$fh>) {
+		chomp;
+		$c = substr($_, 0, 1);
+		last if ($c eq '>' || $c eq '@' || $c eq '+');
+		$seq .= $_;
+	}
+	$aux->[0] = $_;
+	$aux->[1] = 1 if (!defined($aux->[0]));
+	return ($name, $desc, $seq) if ($c ne '+');
+	my $qual = '';
+	while (<$fh>) {
+		chomp;
+		$qual .= $_;
+		if (length($qual) >= length($seq)) {
+			$aux->[0] = undef;
+			return ($name, $desc, $seq, $qual);
+		}
+	}
+	$aux->[1] = 1;
+	return ($name, $desc, $seq);
 }
