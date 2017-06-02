@@ -10,7 +10,7 @@ Dependencies: `fasta-splitter.pl`, `fastq-splitter.pl`, `cd-hit`, `perl` (of cou
 
 CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also be obtained here: https://github.com/weizhongli/cdhit.
 
-`fasta-splitter.pl` and `fastq-splitter.pl` is included in the repository. They can also be obtained here (http://kirill-kryukov.com/study/tools/fasta-splitter/) and here (http://kirill-kryukov.com/study/tools/fastq-splitter/), respectively.
+`fasta-splitter.pl` and `fastq-splitter.pl` are included in the repository. They can also be obtained here (http://kirill-kryukov.com/study/tools/fasta-splitter/) and here (http://kirill-kryukov.com/study/tools/fastq-splitter/), respectively.
 `fasta-splitter.pl` and `fastq-splitter.pl` depend on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these using CPAN (these will be installed by default using `local_install.sh`).
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, and MCE::Loop
