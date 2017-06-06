@@ -15,7 +15,7 @@ CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also b
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, MCE::Loop, and MCE::Shared
 
-The readfq subroutine is included within the `MetaCRAST` script itself. For more details about readfq, go to its GitHub repository (https://github.com/lh3/readfq). 
+The `readfq` subroutine is included within the `MetaCRAST` script itself. For more details about `readfq`, go to its GitHub repository (https://github.com/lh3/readfq). 
 
 A simple local install script is included (`local_install.sh`). To clone and install from this repository, follow these commands from your home directory:
 
