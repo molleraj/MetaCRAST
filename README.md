@@ -2,7 +2,7 @@
 # Introduction
 `MetaCRAST` (Metagenomic CRISPR Reference-Aided Search Tool) is a tool to detect CRISPR arrays in raw, unassembled metagenomes. Unlike other tools, it uses expected CRISPR direct repeat (DR) sequences from assembled contigs or bacterial genomes to guide metagenomic CRISPR detection. It uses a fast implementation of the Wu-Manber multipattern search algorithm to rapidly select reads that contain an expected DR sequence. It then proceeds through reads identified in the previous step to find DR sequences within acceptable distances of each other (i.e., with acceptable length spacers between them). Spacers between these DRs are then extracted and clustered into a non-redundant set with CD-HIT. 
 
-`MetaCRAST` is also parallelizable thanks to the application of Many Core Engine (MCE) and fasta/q-splitter.pl. Metagenome inputs can be split up for parallel CRISPR detection in multi-core systems (see use of -n option). 
+`MetaCRAST` is also parallelizable thanks to the application of Many Core Engine (MCE) and fasta/q-splitter.pl. Metagenome inputs can be split up for parallel CRISPR detection in multi-core systems (see use of -n option). It uses the very fast seqtk-based subroutine `readfq` to load FASTA/Q files and MCE::Shared (`mce_open`) to share temporary files among threads.
 
 # Installation
 
@@ -14,6 +14,8 @@ CD-HIT can be installed by entering `sudo apt-get install cd-hit`. It can also b
 `fasta-splitter.pl` and `fastq-splitter.pl` depend on File::Util, File::Path, File::Basename, and Getopt::Long. Make sure to install these using CPAN (these will be installed by default using `local_install.sh`).
 
 Dependencies (CPAN): Text::Levenshtein::XS, String::Approx, Getopt::Std, Bio::SeqIO, Bio::Perl, MCE, MCE::Loop, and MCE::Shared
+
+The readfq subroutine is included within the `MetaCRAST` script itself. For more details about readfq, go to its GitHub repository (https://github.com/lh3/readfq). 
 
 A simple local install script is included (`local_install.sh`). To clone and install from this repository, follow these commands from your home directory:
 
@@ -32,6 +34,10 @@ Then, to check the number of spacers detected, do this:
 `grep -c ">" test/totalSpacersCD90.fa`
 
 There should be 117 spacers detected.
+
+I have also included two other alternate versions of `MetaCRAST` that may provide better performance. `MetaCRASTs` is not parallelizable, but uses the fast `open` and `readfq` routines to open FASTA/Q files, while `MetaCRASTbp` relies on BioPerl to load FASTA/Q files but does not rely on `mce_open` (MCE::Shared) to share temporary FASTA/Q file parts. 
+
+Recent evaluations suggest mce_open slows down the script considerably, and the open/readfq-dependent `MetaCRASTs` provides the best performance across many average read lengths and sequencing error models (unpublished data). 
 
 # Usage 
 `MetaCRAST` takes **FASTA or FASTQ** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
