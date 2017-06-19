@@ -9,35 +9,30 @@ use String::Approx qw/adist amatch/;
 use Getopt::Std;
 use Bio::SeqIO;
 use Bio::Perl;
-use MCE;
-use MCE::Loop;
-use MCE::Shared;
 
 # print usage if minimum requirements not included in command
 
-my $usage = "MetaCRAST -piod [-tqhrlcan] \n -p patterns.fasta\/q \n -i infile.fasta\/q \n -o output_dir \n [-t] tmp_dir \n"
-." -d dist_allowed \n [-q] (if FASTQ file input) \n [-h] (use Hamming Distance) \n [-r] reverse_complement \n [-l] max_spacer_length \n"
-." [-c] cd_hit_similarity_threshold \n [-a] total_spacer_cd_hit_similarity_threshold \n [-n] num_procs \n [Optional parameters are in brackets] \n";
+my $usage = "MetaCRASTs -piod [-hrlca] \n -p patterns.fasta\/q \n -i infile.fasta\/q \n -o output_dir \n"
+." -d dist_allowed \n [-h] (use Hamming Distance) \n [-r] reverse_complement \n [-l] max_spacer_length \n"
+." [-c] cd_hit_similarity_threshold \n [-a] total_spacer_cd_hit_similarity_threshold \n [Optional parameters are in brackets] \n";
 
 # get values from these options [pidlcnota] 
-getopt('pidlcnota');
+getopt('pidlcoa');
 
 # use this as boolean (either use Hamming distance or do not use it)
-getopts('hrq');
+getopts('hr');
 
 # use these getopt variables as our variables (set scope)
-our($opt_p,$opt_i,$opt_d,$opt_l,$opt_c,$opt_n,$opt_o,$opt_t,$opt_a,$opt_h,$opt_r,$opt_q);
+our($opt_p,$opt_i,$opt_d,$opt_l,$opt_c,$opt_o,$opt_a,$opt_h,$opt_r);
 
 # convert getopt variables into program variables 
 my $pattern_file = $opt_p or die $usage;
 my $fasta_file = $opt_i or die $usage;
 my $output_dir = $opt_o or die $usage;
-my $tmp_dir = $opt_t;
 my $max_dist = $opt_d;
 my $max_spacer_length = $opt_l;
 my $cd_hit_threshold = $opt_c;
 my $total_cd_hit_threshold = $opt_a;
-my $num_procs = $opt_n;
 
 # if no set max spacer length, set it to something ridiculously long (10,000,000 bp long spacer, lol)
 if ( length $max_spacer_length == 0 ) {
@@ -47,86 +42,24 @@ if ( length $max_spacer_length == 0 ) {
 # if no max distance, die usage
 # do this instead of "$opt_d or die usage" so that you can have a 0 value for max_dist
 # darn Perl conventions! :)
-#print $max_spacer_length."\n";
+
 if ( length $max_dist == 0 ) {
 	print "No maximum edit distance specified!\n";
-	die $usage;
-}
-
-# if number of processors specified, there must be a temporary directory named!!
-
-if ( (length $num_procs > 0) && (length $tmp_dir == 0) ) {
-	print "Need to specify a temporary directory for split FASTA files!!\n";
 	die $usage;
 }
 
 # create output_dir
 print `mkdir $output_dir`;
 
-# Bio::SeqIO objects for input pattern and input file 
-#my $pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
-MCE::Shared::open my $pattern_io_IN, "<", $pattern_file;
-mce_open my $pattern_io_IN, "<", $pattern_file;
+# open input pattern FASTA/FASTQ file 
+open my $pattern_io_IN, "<", $pattern_file;
 
+#open input FASTA/FASTQ file
 my @seq_io_IN = ();
-my @fasta_parts = ();
 my $fh;
 
-if ( length $num_procs == 0 ) {
-	#$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
-	#open $fh, '<', $fasta_file;
-	MCE::Shared::open my $fh, "<", $fasta_file;
-	mce_open my $fh, "<", $fasta_file;
-	push @seq_io_IN, $fh;
-}
-
-else {
-	use integer;
-	if ($opt_q == 1) {
-		#my $num_seq_cmd = 'expr $(cat '.$fasta_file.' | wc -l) / 4';
-		#my $num_seqs = `$num_seq_cmd`;
-		#chomp($num_seqs); # make sure that you need to chomp the expr output; I think you do
-		#my $part_size = $num_seqs / $num_procs;
-		my $split_fastq_cmd = "fastq-splitter.pl --n-parts ".$num_procs." --out-dir ".$tmp_dir." ".$fasta_file;
-		print `$split_fastq_cmd`;
-		
-	}
-	else {
-		#my $num_seq_cmd = "grep -c '>' ".$fasta_file;
-		#my $num_seqs = `$num_seq_cmd`;
-		#chomp($num_seqs);
-		#my $part_size = $num_seqs / $num_procs;
-		my $split_fasta_cmd = "fasta-splitter.pl --n-parts ".$num_procs." --out-dir ".$tmp_dir." ".$fasta_file;
-		print `$split_fasta_cmd`;
-	}
-	@fasta_parts = (0..($num_procs-1));
-	my $tmp_count = 0;
-	my @tmp_files = ();
-	opendir(DIR, $tmp_dir) or die $!;
-	while (my $file = readdir(DIR)) {
-    # A file test to check that it is a directory
-	# Use -f to test for a file
-        next unless (-f "$tmp_dir/$file");
-		#print "$file\n";
-		$tmp_files[$tmp_count] = $file;
-		$tmp_count++;
-    }
-
-	my $read_tmp_count = 0;
-	foreach my $tmp_file (@tmp_files) {
-		#$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
-		#open $fh, '<', $tmp_dir."/".$tmp_file;
-		MCE::Shared::open my $fh, "<", $tmp_dir."/".$tmp_file;
-		mce_open my $fh, "<", $tmp_dir."/".$tmp_file;
-		push @seq_io_IN, $fh; 
-		$read_tmp_count++;
-	}
-	MCE::Loop::init {
-		chunk_size => 1, max_workers => 'auto'
-	};
-}
-# set up MCE loop
-
+open my $fh, "<", $fasta_file;
+push @seq_io_IN, $fh;
 
 my @seq_io_OUT_pattern = ();
 my @seq_io_OUT_spacers = ();
@@ -168,21 +101,8 @@ print "Writing detected reads to disk...\n";
 my $seq_number = 0;
 my $step = 100000;
 
-# if no number of processors specified, just do pattern loop once 
-if ( length $num_procs == 0 ) {
+# do pattern loop once 
 patternloop(0);
-}
-
-# if number of processors specified, do pattern loop in parallel with MCE::Loop the specified number of times
-else {
-mce_loop {  
-	patternloop($_);
-} @fasta_parts;
-}
-
-# do pattern loop for remaining FASTA/FASTQ file with remaining few sequences
-# this is done if previous loop done on FASTA/FASTQ files all with the SAME number of sequences!!
-# patternloop($num_procs);
 
 # open pattern files for reading in second step
 my $count = 0;
@@ -196,10 +116,11 @@ foreach my $pattern (@CRISPR_DRs) {
 	$count++;
 }
 
+# extract spacers from saved CRISPR-containing reads 
 spacerloop();
 
 print "Writing detected spacers to disk...\n";
-# save all extracted spacers!
+# save all extracted spacers to FASTA files!
 my $pattern_number_2 = 0;
 foreach my $pattern (@CRISPR_DRs) {
 	if (scalar(@{ $spacers_for_pattern[$pattern_number_2] }) > 0) {
@@ -207,6 +128,7 @@ foreach my $pattern (@CRISPR_DRs) {
 	foreach (@{ $spacers_for_pattern[$pattern_number_2] }) {
 		$spacers_count{$_}++;
 	}
+	# get unique spacers
 	my @unique_spacers = sort keys %spacers_count;
 
 	my $spacer_number = 0;
@@ -229,10 +151,10 @@ foreach my $pattern (@CRISPR_DRs) {
 my $make_total_cmd = "cat ".$output_dir."/Spacers-*.fa > ".$output_dir."/totalSpacers.fa";
 print `$make_total_cmd`;
 
+# convert CD-HIT threshold from decimal to percent
 my $name_cd_hit_threshold = int($cd_hit_threshold*100);
 # Perform CD-HIT if necessary to cluster spacers by given threshold
 if (length $opt_c != 0) {
-	
 	my $pattern_count = 0;
 	foreach my $pattern (@CRISPR_DRs) {
 		my $commandSpacers = "cdhit -i ".$output_dir."/Spacers-".$pattern_count."-".$pattern.".fa -o ".$output_dir."/CD".$name_cd_hit_threshold."Spacers-".$pattern_count."-".$pattern.".fa -c ".$cd_hit_threshold;
@@ -264,12 +186,6 @@ if (length $opt_a != 0) {
 	
 print "Done!\n";
 print "Wrote ".$pattern_count." FASTA files.\n";
-
-# clean up temp files 
-if ( length $num_procs != 0 ) {
-	my $final_cleanup = "rm -rf ".$tmp_dir;
-	print `$final_cleanup`;
-}
 
 sub XORhd {
 	return ($_[0] ^ $_[1]) =~ tr/\001-\255//;

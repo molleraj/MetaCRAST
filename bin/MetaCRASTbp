@@ -11,15 +11,18 @@ use Bio::SeqIO;
 use Bio::Perl;
 use MCE;
 use MCE::Loop;
-use MCE::Shared;
 
 # print usage if minimum requirements not included in command
 
-my $usage = "MetaCRAST -piod [-tqhrlcan] \n -p patterns.fasta\/q \n -i infile.fasta\/q \n -o output_dir \n [-t] tmp_dir \n"
+# my $usage = "MetaCRASTbp -p patterns.fasta -i infile.fasta -o output_dir [-t] tmp_dir -d dist_allowed [-h] (use Hamming Distance) [-r] reverse_complement
+# [-l] max_spacer_length [-c] cd_hit_similarity_threshold [-a] total_spacer_cd_hit_similarity_threshold [-n] num_procs\n";
+
+my $usage = "MetaCRASTbp -piod [-tqhrlcan] \n -p patterns.fasta\/q \n -i infile.fasta\/q \n -o output_dir \n [-t] tmp_dir \n"
 ." -d dist_allowed \n [-q] (if FASTQ file input) \n [-h] (use Hamming Distance) \n [-r] reverse_complement \n [-l] max_spacer_length \n"
 ." [-c] cd_hit_similarity_threshold \n [-a] total_spacer_cd_hit_similarity_threshold \n [-n] num_procs \n [Optional parameters are in brackets] \n";
 
-# get values from these options [pidlcnota] 
+
+# get values from these options [pidlc] 
 getopt('pidlcnota');
 
 # use this as boolean (either use Hamming distance or do not use it)
@@ -64,22 +67,25 @@ if ( (length $num_procs > 0) && (length $tmp_dir == 0) ) {
 print `mkdir $output_dir`;
 
 # Bio::SeqIO objects for input pattern and input file 
-#my $pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
-MCE::Shared::open my $pattern_io_IN, "<", $pattern_file;
-mce_open my $pattern_io_IN, "<", $pattern_file;
-
+my $pattern_io_IN;
+if ($opt_q == 1) {
+	$pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'fastq');
+}
+else
+{
+	$pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
+}
 my @seq_io_IN = ();
 my @fasta_parts = ();
-my $fh;
 
 if ( length $num_procs == 0 ) {
-	#$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
-	#open $fh, '<', $fasta_file;
-	MCE::Shared::open my $fh, "<", $fasta_file;
-	mce_open my $fh, "<", $fasta_file;
-	push @seq_io_IN, $fh;
+	if ($opt_q == 1) {
+		$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'fastq');
+	}
+	else {
+		$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
+	}
 }
-
 else {
 	use integer;
 	if ($opt_q == 1) {
@@ -114,11 +120,12 @@ else {
 
 	my $read_tmp_count = 0;
 	foreach my $tmp_file (@tmp_files) {
-		#$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
-		#open $fh, '<', $tmp_dir."/".$tmp_file;
-		MCE::Shared::open my $fh, "<", $tmp_dir."/".$tmp_file;
-		mce_open my $fh, "<", $tmp_dir."/".$tmp_file;
-		push @seq_io_IN, $fh; 
+		if ($opt_q == 1) {
+			$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'fastq');
+		}
+		else {
+			$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
+		}
 		$read_tmp_count++;
 	}
 	MCE::Loop::init {
@@ -133,11 +140,10 @@ my @seq_io_OUT_spacers = ();
 my @spacers_for_pattern = (); 
 my $pattern_count = 0;
 my @CRISPR_DRs = ();
-my @aux = ();
 
 print "Parsing Input CRISPR DRs...\n";
-while (my ($name, $desc, $seq, $qual) = readfq(\*$pattern_io_IN,\@aux)) {
-	my $pattern = $seq;
+while (my $pattern_object = $pattern_io_IN->next_seq()) {
+	my $pattern = $pattern_object->seq();
         $CRISPR_DRs[$pattern_count] = $pattern;
 	$pattern_count++; 
 }
@@ -168,21 +174,14 @@ print "Writing detected reads to disk...\n";
 my $seq_number = 0;
 my $step = 100000;
 
-# if no number of processors specified, just do pattern loop once 
 if ( length $num_procs == 0 ) {
 patternloop(0);
 }
-
-# if number of processors specified, do pattern loop in parallel with MCE::Loop the specified number of times
 else {
 mce_loop {  
 	patternloop($_);
 } @fasta_parts;
 }
-
-# do pattern loop for remaining FASTA/FASTQ file with remaining few sequences
-# this is done if previous loop done on FASTA/FASTQ files all with the SAME number of sequences!!
-# patternloop($num_procs);
 
 # open pattern files for reading in second step
 my $count = 0;
@@ -406,11 +405,8 @@ sub minindex {
 sub patternloop {
 my $seq_number = 0;
 my $part = $_;
-my @aux = ();
-my $current_file_part = $seq_io_IN[$part];
-#print "@seq_io_IN\n";
-while (my ($name, $desc, $seq, $qual) = readfq(\*$current_file_part,\@aux)) {
-	#my $seq = $seq_object->seq();
+while (my $seq_object = $seq_io_IN[$part]->next_seq()) {
+	my $seq = $seq_object->seq();
 	my $pattern_number = 0;
 
 	foreach my $pattern (@CRISPR_DRs) {
@@ -468,7 +464,6 @@ while (my ($name, $desc, $seq, $qual) = readfq(\*$current_file_part,\@aux)) {
 			}
 		#print join(",",@spacers)."\n";
 		if (scalar(@spacers) > 0 ) {
-			my $seq_object = Bio::Seq->new(-seq => $seq, -display_id => $name, -desc => $desc, -alphabet => 'dna');
 			$seq_io_OUT_pattern[$pattern_number]->write_seq($seq_object);
 		}
 		}	
@@ -476,7 +471,6 @@ while (my ($name, $desc, $seq, $qual) = readfq(\*$current_file_part,\@aux)) {
 	$pattern_number++;
 	}
 	$seq_number++;
-	#print "Sequence Number: ".$seq_number."\n";
 	print "Reads Searched: ".$seq_number."\n" unless ($seq_number % $step);
 }
 }
@@ -552,49 +546,4 @@ while (my $seq_object = $seq_io_READ_pattern[$count]->next_seq()) {
 }
 $count++;
 }
-}
-
-sub readfq {
-	my ($fh, $aux) = @_;
-	@$aux = [undef, 0] if (!defined($aux));
-	return if ($aux->[1]);
-	if (!defined($aux->[0])) {
-		while (<$fh>) {
-			chomp;
-			if (substr($_, 0, 1) eq '>' || substr($_, 0, 1) eq '@') {
-				$aux->[0] = $_;
-				last;
-			}
-		}
-		if (!defined($aux->[0])) {
-			$aux->[1] = 1;
-			return;
-		}
-	}
-	my $header = /^(.+)/? $1 : '';
-	substr($header, 0, 1) = "";
-	my($name, $desc) = split(/\s/, $header, 2);
-	my $seq = '';
-	my $c;
-	$aux->[0] = undef;
-	while (<$fh>) {
-		chomp;
-		$c = substr($_, 0, 1);
-		last if ($c eq '>' || $c eq '@' || $c eq '+');
-		$seq .= $_;
-	}
-	$aux->[0] = $_;
-	$aux->[1] = 1 if (!defined($aux->[0]));
-	return ($name, $desc, $seq) if ($c ne '+');
-	my $qual = '';
-	while (<$fh>) {
-		chomp;
-		$qual .= $_;
-		if (length($qual) >= length($seq)) {
-			$aux->[0] = undef;
-			return ($name, $desc, $seq, $qual);
-		}
-	}
-	$aux->[1] = 1;
-	return ($name, $desc, $seq);
 }
