@@ -65,6 +65,7 @@ To get queries, there is another script provided (`getDRquery.pl`) along with a 
 Here is the usage of `getDRquery.pl`: `getDRquery.pl DR_database_path query output_file`
 
 * **`DR_database_path`** Path to the direct repeat sequence database in FASTA format (e.g., `~/MetaCRAST/data/DRdatabaseTax.fa`)
+A new version of the DR database is provided as of July 17, 2017. This version contains some 3,253 parsed DRs from the most recent DR database provided by CRISPRdb, compared with the 1,978 parsed DRs from the last CRISPRdb update (2014). The new version is called `DRdatabaseTax-new.fa`.  
 * **`query`** The taxon you want to look up in the database (e.g., Escherichia). This should be a kingdom, phylum, class, order, family, genus, or species name.
 * **`output_file`** Name of your output query DR file in FASTA format (e.g., `sample_query.fa`)
 
