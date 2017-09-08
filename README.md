@@ -92,4 +92,6 @@ See installation notes for more details about this test.
 If you notice any bugs or issues, please report them under the 'Issues' tab or contact me at molleraj@gmail.com.
 
 # Citation
-If you use `MetaCRAST` in published work, please include a reference to my PeerJ Preprint: Moller AG, Liang C. (2016) MetaCRAST: Reference-guided extraction of CRISPR spacers from unassembled metagenomes. PeerJ Preprints 4:e2278v2 https://doi.org/10.7287/peerj.preprints.2278v2. The article is currently being submitted to PeerJ for peer review. 
+If you use `MetaCRAST` in published work, please include a reference to my PeerJ article: Moller AG, Liang C. (2017) MetaCRAST: reference-guided extraction of CRISPR spacers from unassembled metagenomes. PeerJ 5:e3788 https://doi.org/10.7717/peerj.3788. 
+
+Previously, `MetaCRAST` was described in a PeerJ Preprint: Moller AG, Liang C. (2016) MetaCRAST: Reference-guided extraction of CRISPR spacers from unassembled metagenomes. PeerJ Preprints 4:e2278v2 https://doi.org/10.7287/peerj.preprints.2278v2. The article was accepted for publication in PeerJ on August 19, 2017. 
