@@ -37,7 +37,7 @@ There should be 117 spacers detected.
 
 I have also included two other alternate versions of `MetaCRAST` that may provide better performance. `MetaCRASTs` is not parallelizable, but uses the fast `open` and `readfq` routines to open FASTA/Q files, while `MetaCRASTbp` relies on BioPerl to load FASTA/Q files but does not rely on `mce_open` (MCE::Shared) to share temporary FASTA/Q file parts. 
 
-Recent evaluations suggest mce_open slows down the script considerably, and the open/readfq-dependent `MetaCRASTs` provides the best performance across many average read lengths and sequencing error models (unpublished data). 
+Recent evaluations suggest mce_open slows down the script considerably, and the open/readfq-dependent `MetaCRASTs` provides the best performance across many average read lengths and sequencing error models (see our recently published PeerJ article). 
 
 # Usage 
 `MetaCRAST` takes **FASTA or FASTQ** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
