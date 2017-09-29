@@ -65,7 +65,7 @@ print `mkdir $output_dir`;
 
 # Bio::SeqIO objects for input pattern and input file 
 #my $pattern_io_IN = Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
-MCE::Shared::open my $pattern_io_IN, "<", $pattern_file;
+#MCE::Shared::open my $pattern_io_IN, "<", $pattern_file;
 mce_open my $pattern_io_IN, "<", $pattern_file;
 
 my @seq_io_IN = ();
@@ -75,7 +75,7 @@ my $fh;
 if ( length $num_procs == 0 ) {
 	#$seq_io_IN[0] = Bio::SeqIO->new(-file => $fasta_file, '-format' => 'Fasta');
 	#open $fh, '<', $fasta_file;
-	MCE::Shared::open my $fh, "<", $fasta_file;
+	#MCE::Shared::open my $fh, "<", $fasta_file;
 	mce_open my $fh, "<", $fasta_file;
 	push @seq_io_IN, $fh;
 }
@@ -116,7 +116,7 @@ else {
 	foreach my $tmp_file (@tmp_files) {
 		#$seq_io_IN[$read_tmp_count] = Bio::SeqIO->new(-file => $tmp_dir."/".$tmp_file, '-format' => 'Fasta');
 		#open $fh, '<', $tmp_dir."/".$tmp_file;
-		MCE::Shared::open my $fh, "<", $tmp_dir."/".$tmp_file;
+		#MCE::Shared::open my $fh, "<", $tmp_dir."/".$tmp_file;
 		mce_open my $fh, "<", $tmp_dir."/".$tmp_file;
 		push @seq_io_IN, $fh; 
 		$read_tmp_count++;
