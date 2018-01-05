@@ -41,13 +41,13 @@ Recent evaluations suggest mce_open slows down the script considerably, and the 
 
 As of January 2018, I have added a third version of MetaCRAST (MetaCRASTp) edited by MCE developer Mario E. Roy that has numerous improvements to MCE parallelization. These improvements include the following:
 
-"Updated to use many cores efficiently during patternloop.
+Updated to use many cores efficiently during patternloop.
 1. Provided fast read iterator with support for Fasta and fastq formats.
 2. Removed overhead regarding original MCE parallelization.
 3. Enabled chunking capability for patternloop (via fasta_iter).
 4. Enabled parallelization for spacerloop.
 5. Apply CPU affinity on Linux platforms (2+ CPU sockets).
--- Mario Roy"
+-- Mario Roy
 
 # Usage 
 `MetaCRAST` takes **FASTA or FASTQ** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
