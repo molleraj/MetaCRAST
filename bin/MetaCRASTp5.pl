@@ -1,0 +1,695 @@
+#!/usr/bin/perl
+
+##
+# https://github.com/molleraj/MetaCRAST/blob/master/bin/MetaCRAST
+#
+# If you use `MetaCRAST` in published work, please include a reference to my
+# PeerJ article: Moller AG, Liang C. (2017) MetaCRAST: reference-guided
+# extraction of CRISPR spacers from unassembled metagenomes.
+# PeerJ 5:e3788 https://doi.org/10.7717/peerj.3788.
+#
+# -- Moller AG, Liang C.
+##
+##
+# Updated to use many cores efficiently during patternloop.
+# https://gist.github.com/marioroy/a519fe649838ea822a65e49d08248b6e
+#
+# 1. Provided fast read iterator with support for Fasta and fastq formats.
+# 2. Removed overhead regarding original MCE parallelization.
+# 3. Enabled chunking capability for patternloop (via fasta_iter).
+# 4. Enabled parallelization for spacerloop.
+# 5. Apply CPU affinity on Linux platforms (2+ CPU sockets).
+#
+# -- Mario Roy
+##
+
+# program to search 454 or Illumina reads for matches to specified CRISPR DRs
+# uses implementation of Wu-Manber multipattern search algorithm
+
+use strict;
+use Text::Levenshtein::XS qw/distance/;
+use String::Approx qw/adist amatch/;
+use Getopt::Std;
+use Bio::SeqIO;
+use Bio::Seq;
+use MCE::Loop;
+use MCE::Shared 1.831;
+use Time::HiRes qw/time/;
+
+# print usage if minimum requirements not included in command
+
+my $usage = "MetaCRASTp -piod [-qhrlcan] \n"
+  . " -p patterns.fasta\/q \n"
+  . " -i infile.fasta\/q \n"
+  . " -o output_dir \n"
+  . " -d dist_allowed \n"
+  . " [-q] (if FASTQ file input) \n"
+  . " [-h] (use Hamming Distance) \n"
+  . " [-r] reverse_complement \n"
+  . " [-l] max_spacer_length \n"
+  . " [-c] cd_hit_similarity_threshold \n"
+  . " [-a] total_spacer_cd_hit_similarity_threshold \n"
+  . " [-n] num_procs \n"
+  . " [-z] apply CPU affinity on Linux platforms \n"
+  . " [Optional parameters are in brackets] \n";
+
+# get values from these options [pidlc]
+getopt('pidlcnoa');
+
+# use this as boolean (either use Hamming distance or do not use it)
+getopts('hrqz');
+
+# use these getopt variables as our variables (set scope)
+our($opt_p,$opt_i,$opt_d,$opt_l,$opt_c,$opt_n,$opt_o,$opt_a,$opt_h,$opt_r,$opt_q);
+our($opt_z);
+
+# For CPU affinity, binding worker to a socket.
+# A worker may run on any core on assigned CPU socket.
+# The set_cpu_affinity function is provided below.
+# See also the two MCE user_begin routines.
+
+my @mem_bind;
+
+if ($opt_z == 1 && $^O eq 'linux' && -r '/proc/cpuinfo') {
+    my $proc_id;
+    open my $proc_fh, '<', '/proc/cpuinfo';
+
+    while (<$proc_fh>) {
+        if (/^processor\s+: (\d+)/) {
+            $proc_id = $1;
+        } elsif (/^physical id\s+: (\d+)/) {
+            push @{ $mem_bind[$1] }, $proc_id;
+        }
+    }
+
+    close $proc_fh;
+    for (0 .. @mem_bind - 1) {
+        $mem_bind[$_] = join(",", @{ $mem_bind[$_] });
+    }
+}
+
+# convert getopt variables into program variables
+my $pattern_file = $opt_p or die $usage;
+my $fasta_file = $opt_i or die $usage;
+my $output_dir = $opt_o or die $usage;
+my $max_dist = $opt_d;
+my $max_spacer_length = $opt_l;
+my $cd_hit_threshold = $opt_c;
+my $total_cd_hit_threshold = $opt_a;
+my $num_procs = $opt_n;
+
+# if no set max spacer length, set it to something ridiculously long (10,000,000 bp long spacer, lol)
+if ( length $max_spacer_length == 0 ) {
+    $max_spacer_length = 10000000;
+}
+
+# if no max distance, die usage
+# do this instead of "$opt_d or die usage" so that you can have a 0 value for max_dist
+if ( length $max_dist == 0 ) {
+    print "No maximum edit distance specified!\n";
+    die $usage;
+}
+
+# create output_dir
+print `mkdir $output_dir` unless -d $output_dir;
+
+# Bio::SeqIO objects for input pattern and input file
+my $pattern_io_IN = ($opt_q == 1)
+    ? Bio::SeqIO->new(-file => $pattern_file, '-format' => 'fastq')
+    : Bio::SeqIO->new(-file => $pattern_file, '-format' => 'Fasta');
+
+# set up parsing
+my @seq_io_OUT_pattern = ();
+my @seq_io_OUT_spacers = ();
+my @spacers_for_pattern = ();
+my $pattern_count = 0;
+my @CRISPR_DRs = ();
+
+print "Parsing Input CRISPR DRs...\n";
+while (my $pattern_object = $pattern_io_IN->next_seq()) {
+    my $pattern = $pattern_object->seq();
+    $CRISPR_DRs[$pattern_count] = $pattern;
+    $pattern_count++;
+}
+
+print "Done!\n";
+print "Total Input CRISPR DRs: ".$pattern_count."\n";
+
+# after parsing patterns, create the pattern output files
+
+my $count = 0;
+
+foreach my $pattern (@CRISPR_DRs) {
+    $seq_io_OUT_pattern[$count] = MCE::Shared->share({ module => 'Bio::SeqIO' },
+        -file   => ">".$output_dir."/Pattern-".$count."-".$pattern.".fa",
+        -format => 'Fasta',
+        -verbose => -1,
+    );
+    $seq_io_OUT_spacers[$count] = Bio::SeqIO->new(
+        -file   => ">".$output_dir."/Spacers-".$count."-".$pattern.".fa",
+        -format => 'Fasta',
+        -verbose => -1,
+    );
+    $seq_io_OUT_spacers[$count]->verbose(-1);
+    $spacers_for_pattern[$count] = MCE::Shared->array();
+    $count++;
+}
+
+print "Writing detected reads to disk...\n";
+
+my $step = 100000;
+my $start = time;
+
+if ( ! $num_procs || $num_procs == 1 ) {
+    my $seq_iter   = fasta_iter($fasta_file, $opt_q);
+    my $seq_number = 0;
+
+    while ( my ($seq_ref) = $seq_iter->() ) {
+        patternloop(++$seq_number, @{ $seq_ref });
+    }
+}
+else {
+    MCE::Loop->init(
+        max_workers => $num_procs, chunk_size => 40,
+        user_begin => sub {
+            # apply CPU affinity on machines with 2+ CPU sockets
+            if (@mem_bind > 1) {
+                my $bind_id = (MCE->wid() - 1) % scalar(@mem_bind);
+                set_cpu_affinity($$, $mem_bind[$bind_id]);
+            }
+        }
+    );
+
+    MCE::Loop->run( sub {
+        my ($mce, $chunk_ref, $chunk_id) = @_;
+        my $seq_number = ($chunk_id - 1) * MCE->chunk_size();
+
+        foreach my $seq_ref (@{ $chunk_ref }) {
+            patternloop(++$seq_number, @{ $seq_ref });
+        }
+
+    }, fasta_iter($fasta_file, $opt_q) );
+
+    MCE::Loop->finish();
+}
+
+printf "Duration (patternloop) %8.03f seconds\n", time - $start;
+
+# open pattern files for reading in second step
+
+my @seq_io_READ_pattern = ();
+
+$count = 0;
+
+foreach my $pattern (@CRISPR_DRs) {
+    $seq_io_READ_pattern[$count] = Bio::SeqIO->new(
+        -file   => "<".$output_dir."/Pattern-".$count."-".$pattern.".fa",
+        -format => 'Fasta',
+        -verbose => -1,
+    );
+    $count++;
+}
+
+print "Writing detected spacers to disk...\n";
+
+$start = time;
+
+if ( ! $num_procs || $num_procs == 1 ) {
+    foreach my $count (0 .. @CRISPR_DRs - 1) {
+        while (my $seq_object = $seq_io_READ_pattern[$count]->next_seq()) {
+            spacerloop($seq_object);
+        }
+    }
+}
+else {
+    # Parallelization using the core MCE API.
+    # Do not enable chunking as the iterator returns 1 sequence.
+
+    my $mce = MCE->new(
+        max_workers => $num_procs, chunk_size => 1,
+        user_begin => sub {
+            # apply CPU affinity on machines with 2+ CPU sockets
+            if (@mem_bind > 1) {
+                my $bind_id = (MCE->wid() - 1) % scalar(@mem_bind);
+                set_cpu_affinity($$, $mem_bind[$bind_id]);
+            }
+        },
+        user_func => sub {
+            my ($mce, $chunk_ref, $chunk_id) = @_;
+            spacerloop($chunk_ref->[0]);
+        }
+    )->spawn();
+
+    # Workers persist between runs.
+
+    foreach my $count (0 .. @CRISPR_DRs - 1) {
+        $mce->process( sub { $seq_io_READ_pattern[$count]->next_seq() } );
+    }
+
+    $mce->shutdown();
+}
+
+printf "Duration (spacerloop ) %8.03f seconds\n", time - $start;
+
+# save all extracted spacers!
+my $pattern_number = 0;
+
+foreach my $pattern (@CRISPR_DRs) {
+    if ( $spacers_for_pattern[$pattern_number]->len() > 0 ) {
+        my %spacers_count = ();
+
+        foreach ( $spacers_for_pattern[$pattern_number]->values() ) {
+            $spacers_count{$_}++;
+        }
+        my @unique_spacers = sort keys %spacers_count;
+        my $spacer_number = 0;
+
+        foreach my $saving_spacer (@unique_spacers) {
+            my $length_saving_spacer = length($saving_spacer);
+            if ($length_saving_spacer <= $max_spacer_length) {
+                my $saving_spacer_obj = Bio::Seq->new(
+                    -seq => $saving_spacer,
+                    -display_id => "P".$pattern_number."S".$spacer_number,
+                    -verbose => -1,
+                );
+                $seq_io_OUT_spacers[$pattern_number]->verbose(-1);
+                $seq_io_OUT_spacers[$pattern_number]->write_seq($saving_spacer_obj);
+                $spacer_number++;
+            }
+        }
+    }
+    $pattern_number++;
+}
+
+# Concatenate all spacers into total spacers file
+
+my $make_total_cmd = "cat ".$output_dir."/Spacers-*.fa > ".$output_dir."/totalSpacers.fa";
+print `$make_total_cmd`;
+
+my $name_cd_hit_threshold = int($cd_hit_threshold*100);
+# Perform CD-HIT if necessary to cluster spacers by given threshold
+if (length $opt_c != 0) {
+    my $pattern_count = 0;
+    foreach my $pattern (@CRISPR_DRs) {
+        my $commandSpacers = "cdhit -i ".$output_dir."/Spacers-".$pattern_count."-".$pattern.".fa -o ".$output_dir."/CD".$name_cd_hit_threshold."Spacers-".$pattern_count."-".$pattern.".fa -c ".$cd_hit_threshold;
+        print `$commandSpacers`;
+        my $cleanSpacers = "rm -f ".$output_dir."/*.clstr";
+        print `$cleanSpacers`;
+        $pattern_count++;
+    }
+
+    my $make_cd_total_cmd = "cat ".$output_dir."/CD*.fa > ".$output_dir."/CD".$name_cd_hit_threshold."totalSpacers.fa";
+    print `$make_cd_total_cmd`;
+
+    if (length $opt_a != 0) {
+        my $commandCDTotalSpacers = "cdhit -i ".$output_dir."/CD".$name_cd_hit_threshold."totalSpacers.fa -o ".$output_dir."/CD".$name_cd_hit_threshold."finalSpacers.fa -c ".$cd_hit_threshold;
+        my $commandCleanCDTotalSpacers = "rm -f ".$output_dir."/*.clstr";
+        print `$commandCDTotalSpacers`;
+        print `$commandCleanCDTotalSpacers`;
+    }
+}
+
+if (length $opt_a != 0) {
+    my $commandTotalSpacers = "cdhit -i ".$output_dir."/totalSpacers.fa -o ".$output_dir."/totalSpacersCD".$name_cd_hit_threshold.".fa -c ".$cd_hit_threshold;
+    my $commandCleanTotalSpacers = "rm -f ".$output_dir."/*.clstr";
+    print `$commandTotalSpacers`;
+    print `$commandCleanTotalSpacers`;
+}
+
+print "Done!\n";
+print "Wrote ".$pattern_count." FASTA files.\n";
+
+sub XORhd {
+    return ($_[0] ^ $_[1]) =~ tr/\001-\255//;
+}
+
+sub XORedgeCheck {
+    my $first0     = substr($_[0], 0,1);
+    my $last0      = substr($_[0],-1,1);
+    my $first1     = substr($_[1], 0,1);
+    my $last1      = substr($_[1],-1,1);
+    my $first_dist = ($first0 ^ $first1) =~ tr/\001-\255//;
+    my $last_dist  = ($last0  ^ $last1 ) =~ tr/\001-\255//;
+
+    if (($first_dist == 0) && ($last_dist == 0)) {
+        return(1);
+    } else {
+        return(0);
+    }
+}
+
+sub getIndicesLD {
+    my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
+    my $seq_len = length($raw_seq);
+    my $DRs_detected = 0;
+    my $pattern_len = length($raw_pattern);
+    my $end_search = $seq_len - $pattern_len - $raw_max_dist;
+    my @start_indices = ();
+    my @end_indices = ();
+    my @distances = ();
+
+    for (my $i = 0; $i<=$end_search; $i++) {
+        my @inner_distances = ();
+        my @inner_comp_strings = ();
+        my @inner_start_indices = ();
+        my @inner_end_indices = ();
+
+        for (my $j=-$raw_max_dist; $j<=$raw_max_dist;$j++) {
+            my $comp_string = substr($raw_seq,$i,$pattern_len+$j);
+            my $fixdex = $j+$raw_max_dist;
+            $inner_comp_strings[$fixdex] = $comp_string;
+            my $comp_len = length($comp_string);
+            my $distance = distance($raw_pattern,$comp_string);
+            $inner_distances[$fixdex] = $distance;
+            $inner_start_indices[$fixdex] = $i;
+            $inner_end_indices[$fixdex] = $i+$comp_len;
+            # if ($j == $raw_max_dist) {
+            #     $i += $pattern_len - $raw_max_dist;
+            # }
+        }
+
+        my $min_dist_index = minindex(\@inner_distances);
+        my $min_distance = $inner_distances[$min_dist_index];
+        my $min_comp_string = $inner_comp_strings[$min_dist_index];
+        my $min_start_index = $inner_start_indices[$min_dist_index];
+        my $min_end_index = $inner_end_indices[$min_dist_index];
+        #my $min_spacer_length = $min_end_index - $min_start_index;
+        #print $raw_max_spacer_length."\n";
+        #print $min_spacer_length."\n";
+
+        if ((XORedgeCheck($raw_pattern,$min_comp_string) == 1) && ($min_distance <= $raw_max_dist)) {
+            # print "Subject Sequence:".$min_comp_string."\n";
+            # print "Pattern Sequence:".$raw_pattern."\n";
+            # print "Start Index:".$min_start_index."\n";
+            $start_indices[$DRs_detected] = $min_start_index;
+            # print "End Index:".$min_end_index."\n";
+            $end_indices[$DRs_detected] = $min_end_index;
+            # print "Distance:".$min_distance."\n";
+            $distances[$DRs_detected] = $min_distance;
+            $DRs_detected++;
+            $i += $pattern_len - $raw_max_dist;
+        }
+    }
+
+    return (\@start_indices,\@end_indices,\@distances);
+}
+
+sub getIndicesHD {
+    my ($raw_pattern,$raw_seq,$raw_max_dist) = @_;
+    my $seq_len = length($raw_seq);
+    my $DRs_detected = 0;
+    my $pattern_len = length($raw_pattern);
+    my $end_search = $seq_len - $pattern_len - $raw_max_dist;
+    my @start_indices = ();
+    my @end_indices = ();
+    my @distances = ();
+
+    for (my $i = 0; $i<=$end_search; $i++) {
+        my $comp_string = substr($raw_seq,$i,$pattern_len);
+        my $comp_len = length($comp_string);
+        my $distance = XORhd($raw_pattern,$comp_string);
+        my $start_index = $i;
+        my $end_index = $i + $comp_len;
+        #my $spacer_length = $end_index - $start_index;
+
+        if ((XORedgeCheck($raw_pattern,$comp_string) == 1) && ($distance <= $raw_max_dist)) {
+            # print "Subject Sequence:".$comp_string."\n";
+            # print "Pattern Sequence:".$raw_pattern."\n";
+            # print "Start Index:".$start_index."\n";
+            $start_indices[$DRs_detected] = $start_index;
+            # print "End Index:".$end_index."\n";
+            $end_indices[$DRs_detected] = $end_index;
+            # print "Distance:".$distance."\n";
+            $distances[$DRs_detected] = $distance;
+            $DRs_detected++;
+            $i += $pattern_len - $raw_max_dist;
+        }
+    }
+
+    return (\@start_indices,\@end_indices,\@distances);
+}
+
+sub getSpacers {
+    my ($seq,$raw_start_indices_ref,$raw_end_indices_ref) = @_;
+    my @raw_start_indices = @{ $raw_start_indices_ref };
+    my @raw_end_indices = @{ $raw_end_indices_ref };
+    my $indices_total = scalar(@raw_start_indices);
+    my @spacers = ();
+    my $current_spot = 0;
+
+    while ($current_spot < ($indices_total-1)) {
+        my $spacer_start = $raw_end_indices[$current_spot];
+        my $spacer_stop = $raw_start_indices[$current_spot+1];
+        my $spacer_length = $spacer_stop - $spacer_start;
+        $spacers[$current_spot] = substr($seq,$spacer_start,$spacer_length);
+        $current_spot++;
+    }
+
+    return(\@spacers);
+}
+
+sub minindex {
+    my( $aref, $idx_min ) = ( shift, 0 );
+    $aref->[$idx_min] < $aref->[$_] or $idx_min = $_ for 1 .. $#{$aref};
+
+    return $idx_min;
+}
+
+sub patternloop {
+    my ($seq_number, $name, $desc, $seq, $qual) = @_;
+    my $pattern_number = 0;
+
+    foreach my $pattern (@CRISPR_DRs) {
+        # Search for both pattern and its reverse complement
+        my $match = amatch($pattern,$max_dist,$seq);
+        my $any_match = ();
+        my $extract_pattern = ();
+        my $rev_match = ();
+
+        if ($opt_r == 1) {
+            my $rev_comp_pattern = revcom_as_string($pattern);
+            $rev_match = amatch($rev_comp_pattern,$max_dist,$seq);
+            $any_match = $match || $rev_match;
+
+            if ($rev_match == 1) {
+                $extract_pattern = $rev_comp_pattern;
+            }
+            if ($match == 1) {
+                $extract_pattern = $pattern;
+            }
+        }
+        else {
+            $any_match = $match;
+            $extract_pattern = $pattern;
+        }
+
+        if ($any_match != 0) {
+            my ($start_indices_ref,$end_indices_ref,$distances_ref) = 0;
+            # only use Hamming distance if it is specified by the -h flag
+            if ($opt_h == 1) {
+                ($start_indices_ref,$end_indices_ref,$distances_ref) = &getIndicesHD($extract_pattern,$seq,$max_dist);
+            }
+            else {
+                ($start_indices_ref,$end_indices_ref,$distances_ref) = &getIndicesLD($extract_pattern,$seq,$max_dist);
+            }
+
+            # print "@$start_indices_ref \n";
+            # print "@$end_indices_ref \n";
+            # print "@$distances_ref \n";
+            my @start_indices = @$start_indices_ref;
+            my @end_indices = @$end_indices_ref;
+            my @distances = @$distances_ref;
+            # my ($new_start_indices,$new_end_indices,$new_distances) = &getCleanIndices($max_dist,@start_indices,@end_indices,@distances);
+            my $spacers_ref = getSpacers($seq,\@start_indices,\@end_indices,$max_spacer_length);
+            # print "@$spacers_ref \n";
+            my @spacers = @$spacers_ref;
+            my @rev_spacers = ();
+
+            if ($opt_r == 1) {
+                if ($rev_match == 1) {
+                    my $count = 0;
+                    foreach my $spacer (@spacers) {
+                        $rev_spacers[$count] = revcom_as_string($spacer);
+                        $count++;
+                    }
+                }
+            }
+
+            #print join(",",@spacers)."\n";
+            if ( scalar(@spacers) > 0 ) {
+                my $seq_object = Bio::Seq->new(
+                    -display_id => $name, -desc => $desc, -seq => $seq,
+                    -alphabet   => 'dna'
+                );
+                $seq_io_OUT_pattern[$pattern_number]->write_seq($seq_object);
+            }
+        }
+
+        $pattern_number++;
+    }
+
+    #print "Sequence Number: ".$seq_number."\n";
+    print "Reads Searched: ".$seq_number."\n" unless ($seq_number % $step);
+}
+
+sub spacerloop {
+    my ($seq_object) = @_;
+    my $seq = $seq_object->seq();
+    my $pattern_number = 0;
+
+    foreach my $pattern (@CRISPR_DRs) {
+        # Search for both pattern and its reverse complement
+        my $match = amatch($pattern,$max_dist,$seq);
+        my $any_match = ();
+        my $extract_pattern = ();
+        my $rev_match = ();
+
+        if ($opt_r == 1) {
+            my $rev_comp_pattern = revcom_as_string($pattern);
+            $rev_match = amatch($rev_comp_pattern,$max_dist,$seq);
+            $any_match = $match || $rev_match;
+
+            if ($rev_match == 1) {
+                $extract_pattern = $rev_comp_pattern;
+            }
+            if ($match == 1) {
+                $extract_pattern = $pattern;
+            }
+        }
+        else {
+            $any_match = $match;
+            $extract_pattern = $pattern;
+        }
+
+        if ($any_match != 0) {
+            my ($start_indices_ref,$end_indices_ref,$distances_ref) = 0;
+            # only use Hamming distance if it is specified by the -h flag
+            if ($opt_h == 1) {
+                ($start_indices_ref,$end_indices_ref,$distances_ref) = &getIndicesHD($extract_pattern,$seq,$max_dist);
+            }
+            else {
+                ($start_indices_ref,$end_indices_ref,$distances_ref) = &getIndicesLD($extract_pattern,$seq,$max_dist);
+            }
+
+            # print "@$start_indices_ref \n";
+            # print "@$end_indices_ref \n";
+            # print "@$distances_ref \n";
+            my @start_indices = @$start_indices_ref;
+            my @end_indices = @$end_indices_ref;
+            my @distances = @$distances_ref;
+            # my ($new_start_indices,$new_end_indices,$new_distances) = &getCleanIndices($max_dist,@start_indices,@end_indices,@distances);
+            my $spacers_ref = getSpacers($seq,\@start_indices,\@end_indices,$max_spacer_length);
+            # print "@$spacers_ref \n";
+            my @spacers = @$spacers_ref;
+
+            if ($opt_r == 1) {
+                if ($rev_match == 1) {
+                    my $count = 0;
+                    foreach my $spacer (@spacers) {
+                        $spacers[$count] = revcom_as_string($spacer);
+                        $count++;
+                    }
+                }
+            }
+
+            #print join(",",@spacers)."\n";
+            $spacers_for_pattern[$pattern_number]->push(@spacers);
+        }
+
+        $pattern_number++;
+    }
+}
+
+sub fasta_iter {
+    my ( $file, $opt_q ) = @_;
+    my ( $off, $pos, $flag, $hdr, $id, $desc, $seq, $qual );
+    my ( $finished, $chunk_size, @chunk );
+
+    open my $fh, '<', $file or die "open error '$file': $!\n";
+
+    {
+        local $/ = \1; my $byte = <$fh>;              # read one byte
+        unless ( $byte eq ( $opt_q ? '@' : '>' ) ) {
+            $/ = $opt_q ? "\n\@" : "\n\>";            # skip comment section
+            my $skip_comment = <$fh>;                 # at the top of file
+        }
+    }
+
+    return sub {
+        return if $finished;
+        local $/ = $opt_q ? "\n\@" : "\n\>";          # input record separator
+
+        $chunk_size = shift || 1;
+
+        while ( $seq = <$fh> ) {
+            if ( substr($seq, -1, 1) eq ( $opt_q ? '@' : '>' ) ) {
+                substr($seq, -1, 1, '');              # trim trailing @ or >
+            }
+            $pos = index($seq, "\n") + 1;             # header and sequence
+            $hdr = substr($seq, 0, $pos - 1);         # extract the header, then
+            substr($seq, 0, $pos, '');                # ltrim header from seq
+
+            chop $hdr if substr($hdr, -1, 1) eq "\r"; # rtrim trailing "\r"
+            ( $id, $desc ) = split(' ', $hdr, 2);     # id and description
+
+            $desc = '' unless defined $desc;
+            $flag = 0;
+
+            if ( $opt_q && ( $pos = index($seq, "\n+") ) > 0 ) {
+                $off = length($seq) - $pos;
+                if ( ( $pos = index($seq, "\n", $pos + 1) ) > 0 ) {
+                    $qual = substr($seq, $pos);       # extract quality
+                    $qual =~ tr/\t\r\n //d;           # trim white space
+                    $flag = 1;
+                }
+                substr($seq, -$off, $off, '');        # rtrim qual from seq
+            }
+
+            $seq =~ tr/\t\r\n //d;                    # trim white space
+
+            if ( $flag && length($qual) != length($seq) ) {
+                # extract quality until length matches sequence
+                do {
+                    my $tmp = <$fh>; $tmp =~ tr/\t\r\n //d;
+                    substr($tmp, -1, 1, '') unless eof($fh);
+                    $qual .= '@'; $qual .= $tmp;
+                } until ( length($qual) == length($seq) || eof($fh) );
+            }
+
+            ( $chunk_size > 1 )
+                ? push @chunk, [ $id, $desc, $seq, $qual || '' ]
+                : return       [ $id, $desc, $seq, $qual || '' ];
+
+            return splice(@chunk, 0, $chunk_size)
+                if ( @chunk == $chunk_size );
+        }
+
+        $finished = 1, close $fh;
+
+        return splice(@chunk, 0, scalar @chunk)
+            if ( $chunk_size > 1 && @chunk );
+
+        return;
+    };
+}
+
+# $status = set_cpu_affinity($$, [1,3]);  # Returns 1 if successful
+# $status = set_cpu_affinity($$, [0,5,7,'9-11']);
+# $status = set_cpu_affinity($$, 0);
+
+sub set_cpu_affinity {
+    my ($pid, $cpu_list_ref) = @_;
+
+    return 0 if ($^O ne 'linux' or !defined $pid or !defined $cpu_list_ref);
+
+    my $cpu_list = (ref $cpu_list_ref eq 'ARRAY')
+        ? join(',', @$cpu_list_ref)
+        : $cpu_list_ref;
+
+    $cpu_list =~ s/\s\s*//g;
+
+    my $taskset_cmd = "taskset --cpu-list --pid $cpu_list $pid";
+    my $taskset_result = qx($taskset_cmd 2>/dev/null);
+
+    return ($? == 0) ? 1 : 0;
+}
