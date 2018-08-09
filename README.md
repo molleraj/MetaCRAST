@@ -103,7 +103,7 @@ See installation notes for more details about this test.
 
 # Issues
 
-If you notice any bugs or issues, please report them under the 'Issues' tab or contact me at molleraj@gmail.com.
+If you notice any bugs or issues, please report them under the 'Issues' tab or contact me at abraham.moller@emory.edu or molleraj@gmail.com.
 
 # Citation
 If you use `MetaCRAST` in published work, please include a reference to my PeerJ article: Moller AG, Liang C. (2017) MetaCRAST: reference-guided extraction of CRISPR spacers from unassembled metagenomes. PeerJ 5:e3788 https://doi.org/10.7717/peerj.3788. 
