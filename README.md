@@ -51,7 +51,7 @@ Updated to use many cores efficiently during patternloop.
 -- Mario Roy
 
 CPU affinity can be applied using the `-z` option for systems running on 2 or more nodes (sockets). An example is below.
-`MetaCRASTp5 -p query/AMDquery.fa -i data/simAMDmetagenome-600-454.fasta -o test -d 3 -l 60 -c 0.9 -a 0.9 -n 64 -z`
+`MetaCRASTp -p query/AMDquery.fa -i data/simAMDmetagenome-600-454.fasta -o test -d 3 -l 60 -c 0.9 -a 0.9 -n 64 -z`
 
 # Usage 
 `MetaCRAST` takes **FASTA or FASTQ** files as inputs (both for the CRISPR DRs and the metagenome). Optional arguments are in brackets. 
