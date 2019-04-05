@@ -68,7 +68,7 @@ And the optional arguments are:
 * **`-t`** Temporary directory to put metagenome parts (use this if -n option also selected)
 * **`-q`** Input metagenome is a FASTQ file (directs use of `fastq-splitter.pl` instead of `fasta-splitter.pl`)
 * **`-h`** Use Hamming distance metric (substitutions only - no insertions or deletions) to find direct repeat locations in reads (default: use Levenshtein distance metric - look for sequences matching DR within insertion, deletion, and/or substitution edit distance) 
-* **`-r`** Search for reverse complement of CRISPR direct repeat sequences (and return reverse complements of spacers in reads containing the reverse complements of query direct repeats)
+* **`-r`** Search for reverse complements of CRISPR direct repeat sequences (and return the reverse complements of spacers in reads containing the reverse complements of query direct repeats)
 * **`-l`** Maximum spacer length in bp
 * **`-c`** CD-HIT similarity threshold for clustering spacers detected for each query direct repeat (value from 0 to 1)
 * **`-a`** CD-HIT similarity threshold for clustering all detected spacers (value from 0 to 1)
