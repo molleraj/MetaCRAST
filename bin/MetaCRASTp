@@ -32,6 +32,7 @@ use String::Approx qw/adist amatch/;
 use Getopt::Std;
 use Bio::SeqIO;
 use Bio::Seq;
+use Bio::Perl;
 use MCE::Loop;
 use MCE::Shared 1.831;
 use Time::HiRes qw/time/;
