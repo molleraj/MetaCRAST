@@ -208,13 +208,15 @@ foreach my $pattern (@CRISPR_DRs) {
 		$spacers_count{$_}++;
 	}
 	my @unique_spacers = sort keys %spacers_count;
-
 	my $spacer_number = 0;
+	my $spacer_count = 0;
+
 	foreach my $saving_spacer (@unique_spacers) {
 		my $length_saving_spacer = length($saving_spacer);
 		if ($length_saving_spacer <= $max_spacer_length) {
+			my $spacer_count = $spacers_count{$saving_spacer};
 			my $saving_spacer_obj = Bio::Seq->new(-seq => $saving_spacer,                        
-				-display_id => "P".$pattern_number_2."S".$spacer_number, -verbose => -1,               
+				-display_id => "P".$pattern_number_2."S".$spacer_number."C".$spacer_count, -verbose => -1,               
                              			);	
 			$seq_io_OUT_spacers[$pattern_number_2]->verbose(-1);
 			$seq_io_OUT_spacers[$pattern_number_2]->write_seq($saving_spacer_obj);
